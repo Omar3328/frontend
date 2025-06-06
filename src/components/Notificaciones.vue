@@ -18,6 +18,11 @@ const obtenerMultas = async () => {
     const response = await axios.get('http://127.0.0.1:8000/api/multas')
     todasLasMultas.value = response.data.filter(multa => multa.tipo === 'multa' || multa.descripcion)
     multasMostradas.value = [...todasLasMultas.value]
+
+    // Abrir automáticamente si hay multas
+    if (multasMostradas.value.length > 0) {
+      mostrarDropdown.value = true
+    }
   } catch (error) {
     console.error('❌ Error al obtener multas:', error)
   }
@@ -48,7 +53,8 @@ onUnmounted(() => {
           v-for="(multa, i) in multasMostradas"
           :key="i"
         >
-          🚨 <strong>Dept ID: {{ multa.departamento_id }}</strong> - {{ multa.descripcion }}
+          🚨 <strong>Dept ID: {{ multa.departamento_id }}</strong> - {{ multa.descripcion }}<br />
+          💵 <strong>Valor:</strong> ${{ multa.valor }}
         </div>
       </div>
       <div v-else>
@@ -62,6 +68,7 @@ onUnmounted(() => {
 .notificaciones-campana {
   position: relative;
   display: inline-block;
+  margin-top: 20px; /* separación del formulario */
 }
 
 .btn-campana {
@@ -87,7 +94,8 @@ onUnmounted(() => {
 .dropdown {
   position: absolute;
   right: 0;
-  margin-top: 10px;
+  top: 100%;
+  margin-top: 5px;
   background: #222;
   color: white;
   border-radius: 8px;
