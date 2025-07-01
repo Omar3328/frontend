@@ -1,4 +1,3 @@
-<!-- src/components/NotificacionesCampana.vue -->
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
@@ -6,6 +5,7 @@ import axios from 'axios'
 const mostrarDropdown = ref(false)
 const todasLasMultas = ref([])
 const multasMostradas = ref([])
+const errorMultas = ref(null)  // Para mostrar errores
 
 let intervaloFetch = null
 
@@ -15,16 +15,30 @@ const toggleDropdown = () => {
 
 const obtenerMultas = async () => {
   try {
-    const response = await axios.get('http://127.0.0.1:8000/api/multas')
+    const token = localStorage.getItem('token')
+    if (!token) {
+      throw new Error('No hay token de autenticación')
+    }
+
+    const response = await axios.get('/multas', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+
+    // Filtra multas que tengan tipo 'multa' o descripción
     todasLasMultas.value = response.data.filter(multa => multa.tipo === 'multa' || multa.descripcion)
     multasMostradas.value = [...todasLasMultas.value]
 
-    // Abrir automáticamente si hay multas
     if (multasMostradas.value.length > 0) {
       mostrarDropdown.value = true
     }
+    errorMultas.value = null
   } catch (error) {
-    console.error('❌ Error al obtener multas:', error)
+    errorMultas.value = error.response?.status === 403
+      ? '❌ No autorizado para obtener multas (403)'
+      : '❌ Error al obtener multas'
+    console.error(error)
   }
 }
 
@@ -47,7 +61,10 @@ onUnmounted(() => {
 
     <div v-if="mostrarDropdown" class="dropdown">
       <h3>🔔 Notificaciones de Multas</h3>
-      <div v-if="multasMostradas.length > 0" class="notificaciones-lista">
+      
+      <div v-if="errorMultas" class="error">{{ errorMultas }}</div>
+
+      <div v-if="multasMostradas.length > 0 && !errorMultas" class="notificaciones-lista">
         <div
           class="notificacion"
           v-for="(multa, i) in multasMostradas"
@@ -57,7 +74,8 @@ onUnmounted(() => {
           💵 <strong>Valor:</strong> ${{ multa.valor }}
         </div>
       </div>
-      <div v-else>
+
+      <div v-else-if="!errorMultas">
         <p>✅ No hay multas registradas.</p>
       </div>
     </div>
@@ -65,10 +83,18 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.error {
+  background-color: #ff4d4f;
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  color: white;
+  font-weight: bold;
+}
 .notificaciones-campana {
   position: relative;
   display: inline-block;
-  margin-top: 20px; /* separación del formulario */
+  margin-top: 20px;
 }
 
 .btn-campana {

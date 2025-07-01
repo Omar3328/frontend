@@ -1,12 +1,16 @@
-<script setup>
-import NavBar from './components/NavBar.vue'
-</script>
-
 <template>
   <div>
-    <NavBar />
-    <main style="padding: 20px;">
-      <router-view />
-    </main>
+    <NavBar v-if="showNavBar" />
+    <router-view />
   </div>
 </template>
+
+<script setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import NavBar from './components/NavBar.vue'
+
+const route = useRoute()
+
+const showNavBar = computed(() => route.path !== '/')  // no mostrar navbar en login
+</script>
