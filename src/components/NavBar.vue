@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
+import Swal from 'sweetalert2'
 import NotificacionesCampana from './Notificaciones.vue'
 
 const router = useRouter()
@@ -12,6 +13,44 @@ const mensaje = ref('')
 const user = ref(null)
 const menuAbierto = ref(false)
 
+const token = ref(localStorage.getItem('token'))
+const sesionValida = ref(!!token.value)
+
+const validarSesionActiva = async () => {
+  if (!token.value) {
+    sesionValida.value = false
+    localStorage.clear()
+    router.push('/')
+    return
+  }
+
+  try {
+    await axios.get('/verificar-token', {
+      headers: {
+        Authorization: `Bearer ${token.value}`
+      }
+    })
+    sesionValida.value = true
+  } catch (error) {
+    if (error.response && error.response.status === 401) {
+      localStorage.setItem('sesion_expirada_pendiente', 'true')
+      sesionValida.value = false
+
+      Swal.fire({
+        icon: 'warning',
+        title: 'Sesión expirada',
+        text: 'Por favor inicia sesión de nuevo.',
+        confirmButtonText: 'Aceptar',
+        allowOutsideClick: false,
+        allowEscapeKey: false
+      }).then(() => {
+        localStorage.clear()
+        window.location.href = '/'
+      })
+    }
+  }
+}
+
 const irAVista = (ruta) => {
   router.push(ruta)
   menuAbierto.value = false
@@ -19,46 +58,33 @@ const irAVista = (ruta) => {
 
 const cerrarSesion = async () => {
   try {
-    const token = localStorage.getItem('token')
-    if (token) {
-      await axios.post('/logout', null, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-    }
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    mensaje.value = '✅ Sesión cerrada con éxito.'
-    mostrarModal.value = true
-
-    setTimeout(() => {
-      mostrarModal.value = false
-      router.push('/')
-    }, 2000)
-  } catch (error) {
-    mensaje.value = '❌ Error al cerrar sesión.'
-    mostrarModal.value = true
-    console.error(error)
+    await axios.post('/logout', null, {
+      headers: {
+        Authorization: `Bearer ${token.value}`
+      }
+    })
+    localStorage.clear()
+    router.push('/')
+  } catch (err) {
+    alert('❌ Error al cerrar sesión')
   }
 }
 
-const cerrarModal = () => {
-  mostrarModal.value = false
-}
-
 onMounted(() => {
+  validarSesionActiva()
+
+  token.value = localStorage.getItem('token')
   const userData = localStorage.getItem('user')
-  if (userData) {
+
+  if (token.value && userData) {
     user.value = JSON.parse(userData)
-    mensaje.value = user.value.role === 'admin'
-      ? `👋 Bienvenido administrador, ${user.value.name}`
-      : `👋 Bienvenido, ${user.value.name}`
-
-    mostrarModal.value = true
-
+    sesionValida.value = true
     setTimeout(() => {
       mostrarModal.value = false
     }, 2500)
   }
+
+  setInterval(validarSesionActiva, 15000)
 })
 
 const mostrarCampana = computed(() => {
@@ -67,7 +93,7 @@ const mostrarCampana = computed(() => {
 </script>
 
 <template>
-  <nav class="nav-bar">
+  <nav class="nav-bar" v-if="sesionValida">
     <div class="nav-left">
       <span class="logo">🐾</span>
     </div>
@@ -84,6 +110,10 @@ const mostrarCampana = computed(() => {
         <button class="nav-btn" @click="irAVista('/panel-admin')">Panel Admin</button>
       </template>
 
+      <template v-if="user">
+        <button class="nav-btn cambiar" @click="irAVista('/cambiar-contrasena')">Cambiar Contraseña</button>
+      </template>
+
       <button class="nav-btn logout" @click="cerrarSesion">Cerrar sesión</button>
 
       <div class="nav-campana" v-if="mostrarCampana">
@@ -91,19 +121,10 @@ const mostrarCampana = computed(() => {
       </div>
     </div>
   </nav>
-
-  <Transition name="slide-fade">
-    <div v-if="mostrarModal" class="modal-overlay" @click="cerrarModal">
-      <div class="modal" @click.stop>
-        <p>{{ mensaje }}</p>
-        <button class="modal-btn" @click="cerrarModal">Cerrar</button>
-      </div>
-    </div>
-  </Transition>
 </template>
 
+
 <style scoped>
-/* Navegación */
 .nav-bar {
   display: flex;
   justify-content: space-between;
@@ -111,24 +132,28 @@ const mostrarCampana = computed(() => {
   background-color: #1e1e2f;
   padding: 15px 30px;
   color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   position: sticky;
   top: 0;
   z-index: 1000;
 }
-
-.nav-left .logo {
+.logo {
   font-weight: bold;
   font-size: 22px;
+  cursor: pointer;
 }
-
-/* Menú */
+.menu-toggle {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: white;
+  cursor: pointer;
+  display: none;
+}
 .nav-links {
   display: flex;
   gap: 12px;
   align-items: center;
 }
-
 .nav-btn {
   background-color: #3b3b5e;
   color: white;
@@ -139,105 +164,64 @@ const mostrarCampana = computed(() => {
   cursor: pointer;
   transition: background-color 0.3s ease;
 }
-
 .nav-btn:hover {
-  background-color: #5e5e8f;
+  background-color: #575780;
 }
-
 .logout {
   background-color: #d9534f;
 }
-
 .logout:hover {
   background-color: #c9302c;
 }
-
+.cambiar {
+  background-color: #2d9cdb;
+}
+.cambiar:hover {
+  background-color: #1c87c9;
+}
 .nav-campana {
   margin-left: 10px;
 }
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
+.sesiones-lista {
+  margin: 20px auto;
+  padding: 20px;
+  max-width: 600px;
+  background: #f4f4f4;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
-
-.modal {
-  background-color: #fff;
-  color: #333;
-  padding: 20px 30px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  min-width: 300px;
+.sesiones-lista h3 {
+  margin-bottom: 15px;
+  color: #3b3b5e;
   text-align: center;
 }
-
-.modal-btn {
-  margin-top: 15px;
-  background-color: #3b3b5e;
+.sesiones-lista ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.sesiones-lista li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #ccc;
+  font-size: 14px;
+  color: #333;
+}
+.sesiones-lista li:last-child {
+  border-bottom: none;
+}
+.sesiones-lista button {
+  background: #c9302c;
   color: white;
   border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
   cursor: pointer;
+  transition: background-color 0.3s ease;
 }
-
-.modal-btn:hover {
-  background-color: #5e5e8f;
-}
-
-/* Transición modal */
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all 0.4s ease;
-}
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  transform: translateY(-20px);
-  opacity: 0;
-}
-
-/* Responsive */
-.menu-toggle {
-  display: none;
-  font-size: 26px;
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
-}
-
-@media (max-width: 768px) {
-  .menu-toggle {
-    display: block;
-  }
-
-  .nav-links {
-    display: none;
-    flex-direction: column;
-    position: absolute;
-    right: 0;
-    top: 60px;
-    background: #2a2a3d;
-    padding: 15px;
-    border-radius: 8px;
-  }
-
-  .nav-links.abierto {
-    display: flex;
-  }
-
-  .nav-btn {
-    width: 100%;
-    margin-bottom: 10px;
-  }
+.sesiones-lista button:hover {
+  background: #a5271c;
 }
 </style>

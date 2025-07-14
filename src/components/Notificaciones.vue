@@ -1,24 +1,25 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import axios from 'axios'
 
 const mostrarDropdown = ref(false)
 const todasLasMultas = ref([])
 const multasMostradas = ref([])
-const errorMultas = ref(null)  // Para mostrar errores
+const errorMultas = ref(null)
 
-let intervaloFetch = null
-
-const toggleDropdown = () => {
+const toggleDropdown = async () => {
   mostrarDropdown.value = !mostrarDropdown.value
+
+  // Solo obtener multas cuando se abre el dropdown
+  if (mostrarDropdown.value) {
+    await obtenerMultas()
+  }
 }
 
 const obtenerMultas = async () => {
   try {
     const token = localStorage.getItem('token')
-    if (!token) {
-      throw new Error('No hay token de autenticación')
-    }
+    if (!token) throw new Error('No hay token de autenticación')
 
     const response = await axios.get('/multas', {
       headers: {
@@ -26,13 +27,8 @@ const obtenerMultas = async () => {
       }
     })
 
-    // Filtra multas que tengan tipo 'multa' o descripción
-    todasLasMultas.value = response.data.filter(multa => multa.tipo === 'multa' || multa.descripcion)
+    todasLasMultas.value = response.data.filter(m => m.tipo === 'multa' || m.descripcion)
     multasMostradas.value = [...todasLasMultas.value]
-
-    if (multasMostradas.value.length > 0) {
-      mostrarDropdown.value = true
-    }
     errorMultas.value = null
   } catch (error) {
     errorMultas.value = error.response?.status === 403
@@ -41,15 +37,6 @@ const obtenerMultas = async () => {
     console.error(error)
   }
 }
-
-onMounted(() => {
-  obtenerMultas()
-  intervaloFetch = setInterval(obtenerMultas, 10000)
-})
-
-onUnmounted(() => {
-  clearInterval(intervaloFetch)
-})
 </script>
 
 <template>
@@ -61,7 +48,7 @@ onUnmounted(() => {
 
     <div v-if="mostrarDropdown" class="dropdown">
       <h3>🔔 Notificaciones de Multas</h3>
-      
+
       <div v-if="errorMultas" class="error">{{ errorMultas }}</div>
 
       <div v-if="multasMostradas.length > 0 && !errorMultas" class="notificaciones-lista">
@@ -70,7 +57,8 @@ onUnmounted(() => {
           v-for="(multa, i) in multasMostradas"
           :key="i"
         >
-          🚨 <strong>Dept ID: {{ multa.departamento_id }}</strong> - {{ multa.descripcion }}<br />
+          🚨 <strong>Dept ID: {{ multa.departamento_id }}</strong><br />
+          {{ multa.descripcion }}<br />
           💵 <strong>Valor:</strong> ${{ multa.valor }}
         </div>
       </div>
@@ -83,35 +71,33 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.error {
-  background-color: #ff4d4f;
-  padding: 8px;
-  border-radius: 6px;
-  margin-bottom: 10px;
-  color: white;
-  font-weight: bold;
-}
 .notificaciones-campana {
   position: relative;
   display: inline-block;
-  margin-top: 20px;
+  margin-top: 10px;
 }
 
 .btn-campana {
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 26px;
   cursor: pointer;
   position: relative;
+  color: #fff;
+  transition: transform 0.2s ease;
+}
+
+.btn-campana:hover {
+  transform: scale(1.1);
 }
 
 .badge {
   position: absolute;
-  top: -5px;
+  top: -4px;
   right: -10px;
   background: red;
   color: white;
-  font-size: 12px;
+  font-size: 11px;
   padding: 2px 6px;
   border-radius: 50%;
   font-weight: bold;
@@ -120,27 +106,44 @@ onUnmounted(() => {
 .dropdown {
   position: absolute;
   right: 0;
-  top: 100%;
-  margin-top: 5px;
-  background: #222;
+  top: 120%;
+  background: #2c2c2c;
   color: white;
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: 10px;
+  padding: 12px;
   width: 300px;
-  max-height: 300px;
+  max-height: 320px;
   overflow-y: auto;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 999;
+}
+
+h3 {
+  margin-top: 0;
+  font-size: 16px;
+  border-bottom: 1px solid #444;
+  padding-bottom: 6px;
 }
 
 .notificacion {
-  border-left: 4px solid #eee;
-  padding: 8px 10px;
-  margin-bottom: 8px;
+  padding: 10px;
+  border-left: 3px solid #ff6b6b;
+  background: #3a3a3a;
+  margin-bottom: 10px;
+  border-radius: 6px;
   font-size: 14px;
 }
 
 .notificacion:last-child {
   margin-bottom: 0;
+}
+
+.error {
+  background-color: #ff4d4f;
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  color: white;
+  font-weight: bold;
 }
 </style>

@@ -20,9 +20,8 @@ const guardarMulta = async () => {
   }
 
   let valorLimpio = valor.value
-    .replace(/\./g, '')   // quitar puntos de miles
-    .replace(',', '.')    // cambiar coma por punto decimal
-
+    .replace(/\./g, '')   
+    .replace(',', '.')   
   if (isNaN(parseFloat(valorLimpio))) {
     agregarResultado('⚠️ El valor debe ser un número válido.')
     return
